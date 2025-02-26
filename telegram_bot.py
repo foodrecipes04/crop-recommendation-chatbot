@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 # Replace with your Telegram Bot Token
-BOT_TOKEN = "7710870583:AAE-G3V9Wh8LgGrV-NLgvjzGxYhTY_kpytY"
+BOT_TOKEN = "YOUR TOKEN"
 
 # Function to get crop recommendation from Flask API
 async def get_crop_recommendation(n, p, k, temperature, humidity, ph, rainfall):
