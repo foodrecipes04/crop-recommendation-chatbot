@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 app = Flask(__name__)
 
 # Load dataset (ensure it includes Soil_Type, Crop_Type, Fertilizer)
-df = pd.read_csv("f2.csv")
+df = pd.read_csv("crop_recommendation.csv")
 
 # Encode categorical columns
 label_encoders = {}
