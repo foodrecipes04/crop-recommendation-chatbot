@@ -3,58 +3,83 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 # Replace with your Telegram Bot Token
-BOT_TOKEN = "YOUR TOKEN"
+BOT_TOKEN = "YOUR_TOKEN"
 
-# Function to get crop recommendation from Flask API
-async def get_crop_recommendation(n, p, k, temperature, humidity, ph, rainfall):
-    url = "http://127.0.0.1:5000/predict"  # Ensure Flask is running
+# Flask API URL
+API_URL = "http://127.0.0.1:5000/predict"  # Make sure Flask server is running here
+
+# Function to get full crop recommendation
+async def get_full_recommendation(n, p, k, temperature, humidity, moisture, soil_type):
     data = {
-        "N": n, "P": p, "K": k,
+        "N": n,
+        "P": p,
+        "K": k,
         "temperature": temperature,
         "humidity": humidity,
-        "ph": ph,
-        "rainfall": rainfall
+        "moisture": moisture,
+        "soil_type": soil_type
     }
-    
-    response = requests.post(url, json=data)
-    
-    # Debugging: Print response details
-    print("🔍 API Response Status Code:", response.status_code)
-    print("🔍 API Response Text:", response.text)
 
     try:
-        response_json = response.json()
-        print("🔍 Parsed JSON:", response_json)
-        return response_json.get("recommended_crop", "Sorry, I couldn't determine the crop.")
+        response = requests.post(API_URL, json=data)
+        response.raise_for_status()
+        result = response.json()
+        print("🔍 API Response:", result)
+        return (
+            result.get("recommended_crop", "Unknown"),
+            result.get("recommended_fertilizer", "Unknown"),
+            result.get("next_crop_for_soil_health", "Unknown"),
+            result.get("recommended_fertilizer_for_next_crop", "Unknown")
+        )
     except Exception as e:
-        print("❌ Error parsing JSON:", e)
-        return "❌ Error: Invalid response from API."
+        print("❌ API Error:", e)
+        return ("Error", "Error", "Error", "Error")
 
-
-
-# Start command
+# /start command
 async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("🌱 Welcome! Send soil details like:\n\n"
-                                    "N,P,K,Temperature,Humidity,pH,Rainfall")
+    await update.message.reply_text(
+        "🌾 Welcome to CropBot!\n\n"
+        "Please send your soil data in this format:\n\n"
+        "`N,P,K,Temperature,Humidity,Moisture,Soil_Type`\n\n"
+        "Example: `40,20,30,25,60,50,Loamy`",
+        parse_mode='Markdown'
+    )
 
-# Handle user messages
+# Message handler
 async def handle_message(update: Update, context: CallbackContext):
     try:
-        values = list(map(float, update.message.text.split(",")))
-        if len(values) != 7:
-            await update.message.reply_text("❌ Invalid input! Send: N,P,K,Temperature,Humidity,pH,Rainfall")
+        parts = update.message.text.split(",")
+        if len(parts) != 7:
+            await update.message.reply_text("❌ Invalid input! Format:\n`N,P,K,Temperature,Humidity,Moisture,Soil_Type`", parse_mode='Markdown')
             return
 
-        crop = await get_crop_recommendation(*values)
-        await update.message.reply_text(f"✅ Recommended Crop: {crop} 🌾")
-    except:
-        await update.message.reply_text("⚠️ Error! Send data in correct format.")
+        # Extract and validate
+        n, p, k = map(float, parts[:3])
+        temperature = float(parts[3])
+        humidity = float(parts[4])
+        moisture = float(parts[5])
+        soil_type = parts[6].strip()
+
+        crop, fert, next_crop, next_fert = await get_full_recommendation(n, p, k, temperature, humidity, moisture, soil_type)
+
+        # Reply to user
+        reply_text = (
+            f"✅ *Recommended Crop:* {crop}\n"
+            f"🧪 *Recommended Fertilizer:* {fert}\n"
+            f"🔄 *Next Crop for Soil Health:* {next_crop}\n"
+            f"🌿 *Fertilizer for Next Crop:* {next_fert}"
+        )
+        await update.message.reply_text(reply_text, parse_mode='Markdown')
+
+    except Exception as e:
+        print("❌ Parsing error:", e)
+        await update.message.reply_text("⚠️ Error! Make sure your input format is correct.")
 
 # Set up the bot
 app = Application.builder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# Start the bot
+# Run bot
 print("✅ Telegram Bot is running...")
 app.run_polling()
